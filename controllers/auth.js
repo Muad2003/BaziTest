@@ -118,7 +118,12 @@ export const register = async (req, res) => {
       return res.status(502).json({ message: "Invalid element data" })
     }
 
-    await connection.query(constants.insertElement, [userId, main_element, favorable_elements, unfavorable_elements])
+    await connection.query(constants.insertElement, [
+      userId,
+      main_element,
+      JSON.stringify(favorable_elements),
+      JSON.stringify(unfavorable_elements),
+    ])
 
     await connection.query("COMMIT")
 
