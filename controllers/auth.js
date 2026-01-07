@@ -243,8 +243,8 @@ export const editProfile = async (req, res) => {
 
       await connection.query(constants.updateElementAfterEditProfile, [
         main_element,
-        JSON.stringify.favorable_elements,
-        JSON.stringify.unfavorable_elements,
+        JSON.stringify(favorable_elements),
+        JSON.stringify(unfavorable_elements),
         user.id,
       ])
 
@@ -254,7 +254,7 @@ export const editProfile = async (req, res) => {
         unfavorable_elements,
       }
     }
-
+    const recommendation = await recalculatePrediction(user.id, main_element)
     await connection.query("COMMIT")
 
     return res.status(200).json({
@@ -365,6 +365,68 @@ export const prediction = async (req, res) => {
     console.error("[Prediction Error]", error)
     return res.status(500).json({ message: "Server error" })
   }
+}
+
+export const recalculatePrediction = async (user_id, element) => {
+  if (!element || !VALID_ELEMENTS.includes(element)) {
+    throw new Error("Invalid element")
+  }
+
+  const today = new Date().toISOString().slice(0, 10)
+  const existingPrediction = await executeQuery(constants.checkPrediction, [user_id, today])
+  if (existingPrediction.rows.length > 0) {
+    return existingPrediction.rows[0].prediction_text
+  }
+
+  const groqApiKey = process.env.GROQ_API_KEY
+  const prompt = `คุณเป็นผู้ช่วยโหราศาสตร์ที่เชี่ยวชาญด้านธาตุประจำตัวและสีมงคล
+
+ข้อมูลผู้ใช้:
+- ธาตุประจำตัว: ${element}
+
+ข้อกำหนดการตอบ:
+- ตอบเป็นข้อความยาวเพียง 1 ประโยคต่อเนื่องเท่านั้น
+- ห้ามขึ้นบรรทัดใหม่
+- ห้ามใช้หัวข้อหรือสัญลักษณ์รายการ
+- ใช้ภาษาไทยสุภาพ อ่านลื่น เหมาะกับหน้าแดชบอร์ด
+- ความยาวไม่เกิน 3–4 บรรทัดบนหน้าจอ
+
+เนื้อหาที่ต้องมีครบในประโยคเดียว:
+- ดัชนีโชคชะตารายวัน (ดี / ปานกลาง / ระวัง)
+- สีมงคล 1–3 สี พร้อมเหตุผลสั้น ๆ ว่าเหมาะกับธาตุอย่างไร
+- คำทำนายโดยสรุปด้านโชคชะตา การงาน การเงิน และความรัก
+`
+
+  const response = await axios.post(
+    "https://api.groq.com/openai/v1/chat/completions",
+    {
+      model: "llama-3.1-8b-instant",
+      messages: [
+        { role: "system", content: "คุณเป็นผู้ช่วยโหราศาสตร์ที่ให้คำทำนายสั้น กระชับ อ่านง่าย สำหรับแสดงบนแดชบอร์ด" },
+        { role: "user", content: prompt },
+      ],
+      max_tokens: 250,
+      temperature: 0.7,
+    },
+    {
+      timeout: 15000,
+      headers: { Authorization: `Bearer ${groqApiKey}`, "Content-Type": "application/json" },
+    }
+  )
+
+  const recommendation =
+    response.data.choices?.[0]?.message?.content ||
+    response.data.choices?.[0]?.text ||
+    "ขอโทษ ไม่สามารถให้คำทำนายได้ในขณะนี้"
+
+  const predictionBefore = await executeQuery(constants.checkPredictionBefor, [user_id])
+  if (predictionBefore.rows.length > 0) {
+    await executeQuery(constants.updatePrediction, [recommendation, today, user_id])
+  } else {
+    await executeQuery(constants.insertPrediction, [user_id, today, recommendation])
+  }
+
+  return recommendation
 }
 
 export const findMenu = async (req, res) => {
