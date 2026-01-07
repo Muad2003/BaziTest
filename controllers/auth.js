@@ -243,8 +243,8 @@ export const editProfile = async (req, res) => {
 
       await connection.query(constants.updateElementAfterEditProfile, [
         main_element,
-        favorable_elements,
-        unfavorable_elements,
+        JSON.stringify.favorable_elements,
+        JSON.stringify.unfavorable_elements,
         user.id,
       ])
 
