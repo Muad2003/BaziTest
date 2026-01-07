@@ -190,6 +190,7 @@ export const editProfile = async (req, res) => {
       (birth_place && birth_place !== user.birth_place)
 
     let baziResult = null
+    let main_element = user.main_element
     if (birthChanged) {
       const finalBirthDate = birth_date || user.birth_date
       const finalBirthTime = birth_time || user.birth_time
@@ -232,7 +233,7 @@ export const editProfile = async (req, res) => {
       }
 
       const summary = baziResponse.data.summary
-      const main_element = summary.dayMaster?.elementTh
+      main_element = summary.dayMaster?.elementTh
       const favorable_elements = summary.favorableElements
       const unfavorable_elements = summary.unfavorableElements
 
@@ -258,7 +259,7 @@ export const editProfile = async (req, res) => {
 
     if (birthChanged) {
       recommendation = await recalculatePrediction(user.id, main_element)
-    }
+    } 
     await connection.query("COMMIT")
 
     return res.status(200).json({
