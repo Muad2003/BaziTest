@@ -254,7 +254,11 @@ export const editProfile = async (req, res) => {
         unfavorable_elements,
       }
     }
-    const recommendation = await recalculatePrediction(user.id, main_element)
+    let recommendation = null
+
+    if (birthChanged) {
+      recommendation = await recalculatePrediction(user.id, main_element)
+    }
     await connection.query("COMMIT")
 
     return res.status(200).json({
